@@ -20,19 +20,19 @@ library (readr)
 
 movies_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/movies.csv"
 movies<-read_csv(url(movies_url))
-head(movies)
+#head(movies)
 
 ratings_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/ratings.csv"
 ratings<-read_csv(url(ratings_url))
-head(ratings)
+#head(ratings)
 
 links_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/links.csv"
 links<-read_csv(url(links_url))
-head(links)
+#head(links)
 
 tags_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/tags.csv"
 tags<-read_csv(url(tags_url))
-head(tags)
+#head(tags)
 ```
 
 ```{r}

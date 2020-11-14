@@ -1,42 +1,209 @@
 ---
 title: "MRS-Testing-git"
 author: "shahin"
-date: "11/11/2020"
+date: "11/03/2020"
 output: html_document
 ---
+# Capstone Project-Movie Recommendation Systems
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r}
+if(!require(tidyverse)) 
+  install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) 
+  install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) 
+  install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(dplyr)) 
+  install.packages("dplyr", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) 
+  install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+if(!require(knitr)) 
+  install.packages("knitr", repos = "http://cran.us.r-project.org")
+if(!require(recommenderlab)) 
+  install.packages("recommenderlab", repos = "http://cran.us.r-project.org")
+if(!require(reshape2)) 
+  install.packages("reshape2", repos = "http://cran.us.r-project.org")
+#library(dplyr)
+#library(ggplot2)
+#library(knitr)
+#install.packages("recommenderlab")
+#library(recommenderlab)
+#install.packages("reshape2") # may already be installed
+#library(reshape2)
 ```
+## Datasets
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r}
 library (readr)
 
 movies_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/movies.csv"
 movies<-read_csv(url(movies_url))
-#head(movies)
+head(movies)
+glimpse(movies)
+summary(movies)
+```
+```{r}
+movie_genre <- as.data.frame(movies$genres, stringsAsFactors = FALSE)
+movie_genre_2 <- as.data.frame(tstrsplit(movie_genre[,1], "[|]", type.convert = TRUE),stringsAsFactors = FALSE)
 
-ratings_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/ratings.csv"
-ratings<-read_csv(url(ratings_url))
-#head(ratings)
+colnames(movie_genre_2) <- c(1:10)
 
-links_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/links.csv"
-links<-read_csv(url(links_url))
-#head(links)
+genre_list <- c("Action", "Adventure", "Animation", "Children", 
+                "Comedy", "Crime","Documentary", "Drama", "Fantasy",
+                "Film-Noir", "Horror", "Musical", "Mystery","Romance",
+                "Sci-Fi", "Thriller", "War", "Western")
 
-tags_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/tags.csv"
-tags<-read_csv(url(tags_url))
-#head(tags)
+genre_matx <- matrix(0,9743,18)
+genre_matx[1,] <- genre_list
+colnames(genre_matx) <- genre_list
+
+for (index in 1:nrow(movie_genre_2)){
+  for(col in 1:ncol(movie_genre_2)){
+    gen_col = which(genre_matx[1,] == movie_genre_2[index,col])
+    genre_matx[index+1,gen_col] <- 1
+  }
+}
+
+genre_matx_2 <- as.data.frame(genre_matx[-1,], stringsAsFactors=FALSE)
+
+for (col in 1:ncol(genre_matx_2)) {
+  genre_matx_2[,col] <- as.integer(genre_matx_2[,col])
+}
+
+head(genre_matx_2)
+```
+```{r search_genres, warning=FALSE, error=FALSE, echo=FALSE}
+search_matrix <- cbind(movies[,1:2], genre_mat2)
+head(search_matrix)
 ```
 
 ```{r}
+ratings_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/ratings.csv"
+ratings<-read_csv(url(ratings_url))
+#remove the timestamp as it may not be required for this project
+ratings <- subset(ratings, select = -c(timestamp) )
+glimpse(ratings)
+summary(ratings)
+head(ratings)
+```
+```{r}
+vector_ratings <- as.vector(ratings$rating)
+sort(unique(vector_ratings))
+kable(table(vector_ratings), caption="Rating frequency")
+```
+```{r}
+vector_ratings <- factor(vector_ratings)
+#hist(vector_ratings, main="Histogram of Ratings", xlab="Rating Value")
+qplot(vector_ratings) + 
+  ggtitle("Distribution of the ratings")
+```
+```{r rat_mat, warning=FALSE, error=FALSE, echo=FALSE}
+#Create ratings matrix. Rows = userId, Columns = movieId
+ratingmat <- dcast(ratings, userId~movieId, value.var = "rating", na.rm=FALSE)
+ratingmat <- as.matrix(ratingmat[,-1]) #remove userIds
 
+#Convert rating matrix into a recommenderlab sparse matrix
+ratingmat <- as(ratingmat, "realRatingMatrix")
+ratingmat
+```
+```{r rel_data, warning=FALSE, error=FALSE, echo=FALSE}
+ratings_movies <- ratingmat[rowCounts(ratingmat) > 50,
+                             colCounts(ratingmat) > 50]
+ratings_movies
+ratingmat
+```
+```{r train_test_sets, warning=FALSE, message=FALSE, echo=FALSE}
+which_train <- sample(x = c(TRUE, FALSE), 
+                      size = nrow(ratings_movies),
+                      replace = TRUE, 
+                      prob = c(0.8, 0.2))
+#head(which_train)
+
+recc_data_train <- ratings_movies[which_train, ]
+recc_data_test <- ratings_movies[!which_train, ]
+
+# which_set <- sample(x = 1:5, 
+#                     size = nrow(ratings_movies), 
+#                     replace = TRUE)
+# for(i_model in 1:5) {
+#   which_train <- which_set == i_model
+#   recc_data_train <- ratings_movies[which_train, ]
+#   recc_data_test <- ratings_movies[!which_train, ]
+# }
+```
+
+```{r normal_data, warning=FALSE, error=FALSE}
+ratings_movies_norm <- normalize(ratings_movies)
+sum(rowMeans(ratings_movies_norm) > 0.00001)
+```
+
+```{r}
+#normalize <- function(x) {
+#  return ((x - min(x)) / (max(x) - min(x)))
+#}
+#ratings <- normalize(ratings)
+
+?Recommender
+```
+
+```{r}
+recommender_models <- recommenderRegistry$get_entries(dataType ="realRatingMatrix")
+recommender_models$UBCF_realRatingMatrix$parameters
+rec_mod <- Recommender(recc_data_train, method = "UBCF", param=list(method="Cosine",nn=10))
+rec_mod
+model_details <- getModel(recc_model)
+model_details$data
+
+top_5_pred <- predict(rec_mod, recc_data_train[1], n=5)
+top_5_pred
+top_5_List <- as(top_5_pred, "list")
+top_5_List
+top_5_df <- data.frame(top_5_List)
+colnames(top_5_df) <- "movieId"
+top_5_df$movieId <- as.numeric(levels(top_5_df$movieId))
+#names <- left_join(top_5_df, movies, by = "movieId")
+names <- left_join(top_5_df, search_matrix, by = "movieId")
+names
+```
+## Applying the recommender model on the test set
+
+In the same way as the IBCF, I now determine the top ten recommendations for each new user in the test set. 
+
+```{r apply_UBCF, warning=FALSE, message=FALSE, echo=FALSE}
+n_recommended <- 10
+recc_predicted <- predict(object = rec_mod,
+                          newdata = recc_data_test, 
+                          n = n_recommended) 
+recc_predicted
+```
+## Explore results
+
+Let's take a look at the first four users:
+
+```{r explore_UBCF, warning=FALSE, message=FALSE, echo=FALSE}
+recc_matrix <- sapply(recc_predicted@items, 
+                      function(x){ as.integer(colnames(ratings_movies)[x]) })
+#dim(recc_matrix)
+recc_matrix[, 1:4]
+```
+
+```{r}
+links_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/links.csv"
+links<-read_csv(url(links_url))
+glimpse(links)
+summary(links)
+head(links)
+```
+```{r}
+tags_url="https://raw.githubusercontent.com/sahmed07/MRS-Testing/main/tags.csv"
+tags<-read_csv(url(tags_url))
+#remove the timestamp as it may not be required for this project
+tags <- subset(tags, select = -c(timestamp) )
+glimpse(tags)
+summary(tags)
+head(tags)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
